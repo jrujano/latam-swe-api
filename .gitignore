@@ -1,0 +1,100 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+.venv.bak/
+
+# Entornos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de configuración de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# Archivos de desarrollo y testing
+.coverage
+htmlcov/
+.pytest_cache/
+.coverage.*
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+test.db
+*.sqlite
+*.sqlite3
+
+# Logs y archivos de sistema
+*.log
+logs/
+*.pot
+
+# Archivos de entorno
+.env
+.env.local
+.env.dev
+.env.prod
+.env.test
+.env.*
+!.env.example
+
+# Archivos de compilación y distribución
+build/
+dist/
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# Archivos de documentación
+docs/_build/
+docs/build/
+
+# Archivos de Jupyter Notebook
+*.ipynb
+*.ipynb_checkpoints
+
+# Archivos de Docker
+docker-compose.override.yml
+docker-compose.*.yml
+
+# Archivos de base de datos (excepto migraciones)
+*.db
+*.sql
+*.dump
+!alembic/versions/*
+
+# Archivos de macOS
+.DS_Store
+
+# Archivos de Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Archivos de editor
+*.bak
+*.tmp
+*~
+*.swp
+*.swo
+
+# Archivos específicos de FastAPI/Frontend
+staticfiles/
+mediafiles/
+uploads/
+
+# Alembic (mantener solo las migraciones)
+!alembic/versions/*.py
+
+# Archivos de desarrollo específicos
+.devcontainer/
+.venv/
