@@ -1,8 +1,10 @@
 import os
-from dotenv import load_dotenv  # Carga las variables de entorno
 from logging.config import fileConfig
-from alembic import context
+
+from dotenv import load_dotenv  # Carga las variables de entorno
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 from app.db.base import Base
 
 # Cargar las variables de entorno desde el archivo .env

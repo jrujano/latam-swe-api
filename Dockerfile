@@ -54,7 +54,7 @@ HEALTHCHECK --interval=30s --timeout=5s \
   CMD curl -f http://localhost:$PORT/health || exit 1
 
 # Expone el puerto en el que se ejecutará la aplicación (documentación, no abre el puerto realmente).
-EXPOSE 8080
+EXPOSE $PORT
 
 # Comando para ejecutar la aplicación cuando se inicie el contenedor.
 # El script run_app.sh se encargará de las migraciones y de iniciar el servidor.

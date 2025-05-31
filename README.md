@@ -6,7 +6,7 @@
 
     ```bash
     git clone <URL_DEL_REPOSITORIO>
-    cd user-management-api
+    cd latam-swe-api
     ```
 
 2.  **Crear un entorno virtual** (recomendado):
@@ -85,11 +85,45 @@ Puedes usar `curl`, Postman, Insomnia o la propia interfaz de Swagger UI para pr
 
 ```json
 {
-  "username": "jane_doe",
-  "email": "jane.doe@example.com",
+  "username": "jrujano",
+  "email": "jrujano@gmail.com",
   "first_name": "Jane",
-  "last_name": "Doe",
+  "last_name": "Johan",
   "role": "user",
   "active": true
 }
+```
+
+# Ejecución Local con Docker
+
+## Pasos para construir y ejecutar la imagen localmente
+
+### 1. Construir la imagen Docker
+
+```bash
+docker build --no-cache -t user-management-api:latest .
+```
+
+### 2. Ejecutar el contenedor
+
+```bash
+docker run -p 8000:8080 \
+  -e "SQLALCHEMY_DATABASE_URL=sqlite:///./sql_app.db"   user-management-api:latest
+```
+
+Parámetros importantes:
+
+-p 8000:8080: Mapea el puerto 8000 de tu máquina local al puerto 8080 del contenedor
+
+-e: Establece variables de entorno:
+
+SQLALCHEMY_DATABASE_URL=sqlite:///./sql_app.db: URL de conexión a la base de datos usando SQLite (se creará un archivo sql_app.db en el contenedor)
+
+# Comando para Despliegue en Google Cloud Build
+
+```bash
+gcloud builds submit . \
+  --config cloudbuild.yaml \
+  --substitutions _PROJECT_ID="TU DI PROJECT",_BUILD_ID="$(date +%Y%m%d%H%M%S)" \
+  --verbosity=debug
 ```

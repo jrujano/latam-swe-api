@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import crud, schemas
+from app.auth.auth_bearer import JWTBearer
 from app.core import deps
 
 router = APIRouter()
@@ -220,6 +221,35 @@ def delete_user(user_id: int, db: Session = Depends(deps.get_db)):
     Elimina un usuario por su ID.
     - **user_id**: El ID del usuario a eliminar.
     """
+    eliminar_usuario_por_id(db, user_id)
+    return {"message": "Usuario eliminado con éxito"}
+
+
+@router.delete(
+    "/users/secure/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un usuario con metodo de Seguridad JWT",
+    response_description="No Content",
+    description="Elimina un perfil de usuario por su ID único.",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Usuario no encontrado"}},
+)
+def delete_secure_user(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: any = Depends(JWTBearer()),
+):
+    """
+    Elimina un usuario por su ID usando autenticación JWT.
+    - **user_id**: El ID del usuario a eliminar.
+    """
+    eliminar_usuario_por_id(db, user_id)
+    return {"message": "Usuario eliminado con éxito"}
+
+
+def eliminar_usuario_por_id(db: Session, user_id: int) -> None:
+    """
+    Elimina un usuario por su ID. Lanza HTTPException si no existe o si ocurre un error.
+    """
     try:
         db_user_actual = crud.crud_user.get(db, id=user_id)
         if db_user_actual:
@@ -229,10 +259,9 @@ def delete_user(user_id: int, db: Session = Depends(deps.get_db)):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
                 )
-            return {
-                "message": "Usuario eliminado con éxito"
-            }
+            logger.info(f"Usuario con ID {user_id} eliminado con éxito.")
         else:
+            logger.warning(f"Usuario con ID {user_id} no encontrado para eliminar.")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
             )
