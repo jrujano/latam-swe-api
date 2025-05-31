@@ -12,66 +12,55 @@ steps:
       - '-t'
       - 'gcr.io/${_PROJECT_ID}/user-management-latam-api:latest'
       - '.' # El contexto de la construcción es el directorio actual
-    # volumes:
-    #   - name: 'pip_cache'
-    #     path: '/root/.cache/pip'
+    volumes:
+      - name: 'pip_cache'
+        path: '/root/.cache/pip'
 
   # Paso 2: Ejecutar las pruebas unitarias y de integración
-  # Se ejecuta un nuevo contenedor basado en la imagen recién construida para ejecutar las pruebas.
-  # - name: 'gcr.io/${_PROJECT_ID}/user-management-latam-api:${_BUILD_ID}' # Ejecuta sobre la imagen recién construida
-  #   id: Test
-  #   entrypoint: 'pytest' # El comando para ejecutar pytest
-  #   args: ['tests/'] # Ejecuta las pruebas en el directorio 'tests/'
-  #   env:
-  #     - 'SQLALCHEMY_DATABASE_URL=sqlite:///./test.db' # Configura la DB para pruebas (SQLite en memoria/archivo)
-  #   # Reutiliza la caché de pip del paso de construcción para las dependencias de prueba.
-  #   volumes:
-  #     - name: 'pip_cache'
-  #       path: '/root/.cache/pip'
-  #   allow_failure: true
-  # Paso 3: Desplegar la aplicación en Google Cloud Run
-  # Despliega la imagen 'latest' en Cloud Run, creando o actualizando el servicio.
+  - name: 'gcr.io/${_PROJECT_ID}/user-management-latam-api:${_BUILD_ID}'
+    id: Test
+    entrypoint: 'pytest'
+    args: ['tests/']
+    env:
+      - 'SQLALCHEMY_DATABASE_URL=sqlite:///./test.db'
+    volumes:
+      - name: 'pip_cache'
+        path: '/root/.cache/pip'
+    allow_failure: true # Esto permite que el build continúe aunque las pruebas fallen
+
   # Paso 3: Desplegar la aplicación en Google Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     id: Deploy
     args:
       - 'run'
       - 'deploy'
-      - 'user-management-api' # Nombre del servicio de Cloud Run (puede ser diferente al nombre de la imagen)
+      - 'user-management-api'
       - '--image'
-      - 'gcr.io/${_PROJECT_ID}/user-management-latam-api:latest' # Despliega la imagen 'latest'
+      - 'gcr.io/${_PROJECT_ID}/user-management-latam-api:latest'
       - '--region'
-      - 'us-central1' # **¡IMPORTANTE!** Asegúrate de que esta región coincida con la de tu instancia 'latamapi'
+      - 'us-central1'
       - '--platform'
-      - 'managed' # Usa el entorno gestionado de Cloud Run
-      - '--allow-unauthenticated' # Permite acceso público a la API (ajusta según tus necesidades de seguridad)
+      - 'managed'
+      - '--allow-unauthenticated'
       - '--port'
-      - '8080' # El puerto que expone tu aplicación FastAPI dentro del contenedor (debe coincidir con tu app)
-      # --- CONFIGURACIÓN DE BASE DE DATOS PARA PRODUCCIÓN ---
-      # Conexión a Cloud SQL 'latamapi' usando el Cloud SQL Proxy.
-      # ¡ESTA ES LA LÍNEA QUE DEBES CAMBIAR!
+      - '8080'
       - '--set-env-vars=SQLALCHEMY_DATABASE_URL=postgresql+psycopg2://latamuser:lEONEaLE05.@/latam-api?host=/cloudsql/${_PROJECT_ID}:us-central1:latamapi'
-    # AsegúrAsegurarate de que la cuenta de servicio predeterminada de Cloud Run (o la que asignes)
-    # tenga los permisos necesarios para conectar con tu instancia de Cloud SQL (rol 'Cloud SQL Client').
 
   # Paso 4: Limpiar imágenes Docker antiguas en Container Registry
-  # Este paso es opcional, pero muy recomendado para evitar acumulación de imágenes
-  # no utilizadas y controlar el costo de almacenamiento en Container Registry.
   - name: 'gcr.io/cloud-builders/gcloud'
     id: Clean-up-images
     entrypoint: bash
-    allow_failure: true
+    allow_failure: true # Permite que el build continúe si falla la limpieza
     args:
       - '-c'
       - |
-        # Lista todas las imágenes excepto la última etiquetada como 'latest'
         gcloud container images list-tags gcr.io/${_PROJECT_ID}/user-management-latam-api \
           --filter="NOT TAG (latest)" \
           --format='get(digest)' \
           | sed 's/^/gcr.io\/${_PROJECT_ID}\/user-management-latam-api@/' \
           | xargs -r gcloud container images delete --force-delete-tags --quiet
 
-# Define las imágenes que serán creadas y subidas a Container Registry por esta construcción.
+# Define las imágenes que serán creadas y subidas a Container Registry
 images:
   - 'gcr.io/${_PROJECT_ID}/user-management-latam-api:${_BUILD_ID}'
   - 'gcr.io/${_PROJECT_ID}/user-management-latam-api:latest'
