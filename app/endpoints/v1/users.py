@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
         status.HTTP_422_UNPROCESSABLE_ENTITY: {
             "description": "Error de validación de entrada"
         },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "Error interno del servidor"
+        },
     },
 )
 def create_user(user: schemas.UserCreate, db: Session = Depends(deps.get_db)):
@@ -44,29 +47,37 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(deps.get_db)):
     - **role**: Rol del usuario (admin, user, guest). Por defecto "user".
     - **active**: Booleano que indica si el usuario está activo. Por defecto True.
     """
+    try:
+        # Validar si el username ya existe
+        existing_username = crud.crud_user.get_user_by_username(db, user.username)
+        existing_email = crud.crud_user.get_user_by_email(db, user.email)
 
-    # Validar si el username ya existe
-    existing_username = crud.crud_user.get_user_by_username(db, user.username)
-    existing_email = crud.crud_user.get_user_by_email(db, user.email)
+        if existing_username or existing_email:
+            if existing_email:
+                detail_error = "La dirección de correo electrónico ya existe."
+                logger.warning(detail_error)
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=detail_error,
+                )
+            else:
+                detail_error = "El nombre de usuario ya existe."
+                logger.warning(detail_error)
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=detail_error,
+                )
 
-    if existing_username or existing_email:
-        if existing_email:
-            detail_error = "La dirección de correo electrónico ya existe."
-            logger.warning(detail_error)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=detail_error,
-            )
-        else:
-            detail_error = "El nombre de usuario ya existe."
-            logger.warning(detail_error)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=detail_error,
-            )
-
-    db_user = crud.crud_user.create(db=db, obj_in=user)
-    return db_user
+        db_user = crud.crud_user.create(db=db, obj_in=user)
+        return db_user
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error inesperado al crear usuario: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error interno del servidor"
+        )
 
 
 @router.get(
@@ -82,10 +93,17 @@ def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(deps.get_d
     - **skip**: Número de usuarios a omitir (para paginación).
     - **limit**: Número máximo de usuarios a devolver.
     """
-    logger.info(f"Recuperando usuarios (skip: {skip}, limit: {limit}).")
-    users = crud.crud_user.get_multi(db, skip=skip, limit=limit)
-    logger.info(f"Se recuperaron {len(users)} usuarios.")
-    return users
+    try:
+        logger.info(f"Recuperando usuarios (skip: {skip}, limit: {limit}).")
+        users = crud.crud_user.get_multi(db, skip=skip, limit=limit)
+        logger.info(f"Se recuperaron {len(users)} usuarios.")
+        return users
+    except Exception as e:
+        logger.error(f"Error inesperado al recuperar usuarios: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error interno del servidor"
+        )
 
 
 @router.get(
@@ -101,15 +119,22 @@ def read_user(user_id: int, db: Session = Depends(deps.get_db)):
     Recupera un usuario por su ID.
     - **user_id**: El ID del usuario a recuperar.
     """
-    logger.info(f"Recuperando usuario con ID: {user_id}")
-    db_user = crud.crud_user.get(db, id=user_id)
-    if db_user is None:
-        logger.warning(f"Usuario con ID {user_id} no encontrado.")
+    try:
+        db_user = crud.crud_user.get(db, id=user_id)
+        if db_user is None:
+            logger.warning(f"Usuario con ID {user_id} no encontrado.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+            )
+        return db_user
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error inesperado al recuperar usuario: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error interno del servidor"
         )
-    logger.info(f"Usuario con ID {user_id} recuperado con éxito.")
-    return db_user
 
 
 @router.put(
@@ -136,43 +161,50 @@ def update_user(
     - **user_id**: El ID del usuario a actualizar.
     - **user**: Objeto con los campos a actualizar (opcionales).
     """
-    logger.info(f"Intentando actualizar usuario con ID: {user_id}")
+    try:
 
-    # Obtener usuario actual
-    db_user_actual = crud.crud_user.get(db, id=user_id)
-    if db_user_actual is None:
-        logger.warning(
-            f"No se pudo actualizar: Usuario con ID {user_id} no encontrado."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
-        )
-
-    # Validar username si fue modificado
-    if user.username and user.username != db_user_actual.username:
-        existing_username = crud.crud_user.get_user_by_username(db, user.username)
-        if existing_username and existing_username.id != user_id:
-            logger.warning(f"El nombre de usuario '{user.username}' ya existe.")
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="El nombre de usuario ya existe.",
-            )
-
-    # Validar email si fue modificado
-    if user.email and user.email != db_user_actual.email:
-        existing_email = crud.crud_user.get_user_by_email(db, user.email)
-        if existing_email and existing_email.id != user_id:
+        # Obtener usuario actual
+        db_user_actual = crud.crud_user.get(db, id=user_id)
+        if db_user_actual is None:
             logger.warning(
-                f"La dirección de correo electrónico '{user.email}' ya existe."
+                f"No se pudo actualizar: Usuario con ID {user_id} no encontrado."
             )
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="La dirección de correo electrónico ya existe.",
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
             )
 
-    db_user = crud.crud_user.update(db, db_obj=db_user_actual, obj_in=user)
-    logger.info(f"Usuario con ID {user_id} actualizado con éxito.")
-    return db_user
+        # Validar username si fue modificado
+        if user.username and user.username != db_user_actual.username:
+            existing_username = crud.crud_user.get_user_by_username(db, user.username)
+            if existing_username and existing_username.id != user_id:
+                logger.warning(f"El nombre de usuario '{user.username}' ya existe.")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="El nombre de usuario ya existe.",
+                )
+
+        # Validar email si fue modificado
+        if user.email and user.email != db_user_actual.email:
+            existing_email = crud.crud_user.get_user_by_email(db, user.email)
+            if existing_email and existing_email.id != user_id:
+                logger.warning(
+                    f"La dirección de correo electrónico '{user.email}' ya existe."
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="La dirección de correo electrónico ya existe.",
+                )
+
+        db_user = crud.crud_user.update(db, db_obj=db_user_actual, obj_in=user)
+        return db_user
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error inesperado al actualizar usuario: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error interno del servidor"
+        )
 
 
 @router.delete(
@@ -188,21 +220,27 @@ def delete_user(user_id: int, db: Session = Depends(deps.get_db)):
     Elimina un usuario por su ID.
     - **user_id**: El ID del usuario a eliminar.
     """
-    logger.info(f"Intentando eliminar usuario con ID: {user_id}")
-    db_user_actual = crud.crud_user.get(db, id=user_id)
-    print(db_user_actual)
-    if db_user_actual:
-      success = crud.crud_user.remove(db=db,id=user_id)
-      if not success:
-          logger.warning(f"No se pudo eliminar: Usuario con ID {user_id} no encontrado.")
-          raise HTTPException(
-              status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
-          )
-      logger.info(f"Usuario con ID {user_id} eliminado con éxito.")
-      return {
-          "message": "Usuario eliminado con éxito"
-      }  # Aunque el status es 204, FastAPI necesita un retorno.
-    else:
-       raise HTTPException(
-              status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
-          )
+    try:
+        db_user_actual = crud.crud_user.get(db, id=user_id)
+        if db_user_actual:
+            success = crud.crud_user.remove(db=db, id=user_id)
+            if not success:
+                logger.warning(f"No se pudo eliminar: Usuario con ID {user_id} no encontrado.")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+                )
+            return {
+                "message": "Usuario eliminado con éxito"
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+            )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error inesperado al eliminar usuario: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error interno del servidor"
+        )
