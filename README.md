@@ -124,6 +124,13 @@ SQLALCHEMY_DATABASE_URL=sqlite:///./sql_app.db: URL de conexión a la base de da
 ```bash
 gcloud builds submit . \
   --config cloudbuild.yaml \
-  --substitutions _PROJECT_ID="TU DI PROJECT",_BUILD_ID="$(date +%Y%m%d%H%M%S)" \
+  --substitutions _PROJECT_ID="TU DI PROJECT",_BUILD_ID="$(date +%Y%m%d%H%M%S)",_DB_URL="postgresql+psycopg2://user:pass@/dbname?host=/cloudsql/project:region:instance" \
   --verbosity=debug
+```
+
+Recomendacion Usa Secret Manager para almacenar \_DB_URL
+
+```bash
+DB_URL=$(gcloud secrets versions access latest --secret="DB_CONNECTION_URL")
+gcloud builds submit ... --substitutions=_DB_URL="$DB_URL"
 ```
